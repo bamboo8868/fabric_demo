@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title></title>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/fabric"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.4.19/vue.global.prod.min.js"
+            integrity="sha512-fKBNYyrjNXpxYeecQyWzpvdaD1p+8MUKpiTF3oPkSggVIpq6R17Q7EZ6RFg8PBoSslppmWeUvUWPp8NBr8b3Aw=="
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<body>
+
+<div style="display:flex" id="app">
+    <div style="width:200px">
+        <button ondragstart="onDragstart('rect')" draggable="true" onclick="setText('例A1565555555','tag_no')">内单号
+        </button>
+        <button draggable="true" onclick="setLine()">横线</button>
+        <button draggable="true" onclick="setVeritcalLine()">竖线</button>
+        <button draggable="true" onclick="setRect()">矩形</button>
+        <button ondragstart="onDragstart('i-text')" draggable="true" onclick="setIText()">自定义文本</button>
+
+        <input type="file" accept="image/*" name="" id="upload" onchange="handleImg(this)">
+        <button type="file" ondragstart="onDragstart('i-text')" draggable="true" onclick="setImg()">自定义图片</button>
+
+    </div>
+    <div style="flex-grow:1">
+        <div>
+            <input id="a"/>
+            <input id="b"/>
+            <button onclick="set()">Submit</button>
+        </div>
+
+        <canvas id="canvas" width="595" height="841" style="border:1px solid red;margin-top:10px"></canvas>
+    </div>
+
+    <div>
+        <div>{{ message }}</div>
+        <div>
+
+        </div>
+    </div>
+</div>
+
+
+<script type="text/javascript">
+
+    let type = null;
+
+    function onDragstart(type_name) {
+        type = type_name;
+    }
+
+    Vue.createApp({
+        data() {
+            return {
+                message: 'Hello Vue!'
+            }
+        }
+    }).mount('#app')
+    const canvas = new fabric.Canvas('canvas');
+
+    canvas.on('drop', (opt) => {
+        console.log(opt);
+        let offset = {
+            left: canvas.getSelectionElement().getBoundingClientRect().left,
+            top: canvas.getSelectionElement().getBoundingClientRect().top
+        }
+        console.log("offset", offset);
+
+        // 鼠标坐标转换成画布的坐标（未经过缩放和平移的坐标）
+        let point = {
+            x: opt.e.x - offset.left,
+            y: opt.e.y - offset.top,
+        }
+        if (type === 'rect') {
+            setRect(point);
+        }
+
+        if (type === 'i-text') {
+            setIText(point);
+        }
+
+        type = null;
+    })
+
+    function set() {
+        let width = document.querySelector("#a").value;
+        let height = document.querySelector("#b").value;
+        width = width * 2.835 * 96 / 72;
+        height = height * 2.835 * 96 / 72;
+        canvas.setWidth(width)
+        canvas.setHeight(height)
+        // document.querySelector("#canvas").width = width;
+        // document.querySelector("#canvas").height = height;
+
+    }
+
+    function setText(text, sys_field) {
+        let obj = new fabric.Text(text, {
+            left: 100,
+            top: 100,
+            fontSize: 50
+        })
+        if (sys_field) {
+            obj.sys_field = sys_field;
+        }
+        canvas.add(obj)
+    }
+
+    function setIText(attr) {
+        let obj = new fabric.IText("请输入你想要的文字", {
+            left: attr.x || 100,
+            top: attr.y || 100,
+            fontSize: 14
+        })
+        canvas.add(obj)
+    }
+
+    function setLine() {
+        let line = new fabric.Line([100, 100, 200, 100], {
+            stroke: 'black',
+            strokeWidth: 2
+        })
+        line.sys_type = 'tag_no';
+
+        canvas.add(line);
+    }
+
+    function setVeritcalLine(argument) {
+        let line = new fabric.Line([100, 100, 100, 400], {
+            stroke: 'black',
+            strokeWidth: 2
+        })
+        line.sys_type = 'tag_no';
+
+        canvas.add(line);
+    }
+
+    function setRect(attr) {
+        console.log(attr);
+        let Rect = fabric.Rect;
+        let line = new fabric.Rect({
+            left: attr.x || 0,
+            top: attr.y || 0,
+            width: 200,
+            height: 100,
+            fill: 'transparent', // 填充色
+            stroke: '#000' // 边框颜色
+        })
+
+        canvas.add(line);
+    }
+
+    canvas.on('selection:created', function () {
+        let obj = canvas.getActiveObject();
+        console.log(obj, obj.get('type'), obj.sys_type);
+    });
+
+    canvas.on('selection:selected', function () {
+        let obj = canvas.getActiveObject();
+        console.log(obj, obj.get('type'), obj.sys_type);
+    });
+
+
+    canvas.on('object:modified', function () {
+        console.log("change")
+        let obj = canvas.getActiveObject();
+        console.log(obj);
+        let type = obj.get('type');
+        if (type === 'rect') {
+            let attr = {
+                width: obj.width * obj.scaleX,
+                height: obj.height * obj.scaleY,
+                scaleX: 1,
+                scaleY: 1
+            }
+            obj.set(attr);
+        }
+        if (type === 'i-text') {
+            let attr = {
+                width: obj.width * obj.scaleX,
+                height: obj.height * obj.scaleY,
+                scaleX: 1,
+                scaleY: 1,
+            }
+            obj.set(attr);
+        }
+
+    })
+
+    function setImg() {
+        document.querySelector("#upload").click();
+    }
+
+    function handleImg(e) {
+        console.log(e.files[0])
+        let url = window.URL.createObjectURL(e.files[0])
+       console.log(url);
+        fabric.Image.fromURL('https://img-home.csdnimg.cn/images/20240218021830.png',(img)=>{
+            img.set({scaleX:0.2,scaleY:0.2})
+            canvas.add(img);
+        })
+        // var img = new fabric.Image(url);
+        // img.set({left:100,top:100});
+        // canvas.add(img);
+        // var reader = new FileReader();
+        // reader.onload = function(e) {
+        //     var image = new Image();
+        //     image.src = e.files[0];
+        //     image.onload = function() {
+        //         var img = new fabric.Image(image);
+        //         img.set({
+        //             left: 100,
+        //             top: 60
+        //         });
+        //         img.scaleToWidth(200);
+        //         canvas.add(img).setActiveObject(img).renderAll();
+        //     }
+        // }
+        // reader.readAsDataURL(e.target.files[0]);
+    }
+
+</script>
+</body>
+</html>
