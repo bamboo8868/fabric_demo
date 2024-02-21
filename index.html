@@ -24,6 +24,7 @@
 
         <input type="file" accept="image/*" name="" id="upload" onchange="handleImg(this)">
         <button type="file" ondragstart="onDragstart('i-text')" draggable="true" onclick="setImg()">自定义图片</button>
+        <button draggable="true" onclick="test()">自定义按钮</button>
 
     </div>
     <div style="flex-grow:1">
@@ -37,15 +38,33 @@
     </div>
 
     <div>
-        <div>{{ message }}</div>
+        {{ message }}
         <div>
-
+            <div v-if="!real_empty(edit_info.left)">
+                <span>X轴</span>
+                <input type="number" v-model="edit_info.left" @change="changeActiveObject()"/>
+            </div>
+            <div v-if="edit_info.top || edit_info.top == 0">
+                <span>Y轴</span>
+                <input type="number" v-model="edit_info.top" @change="changeActiveObject()"/>
+            </div>
+            <div v-if="edit_info.text">
+                <span>文本</span>
+                <input type="text" v-model="edit_info.text" @change="changeActiveObject()"/>
+            </div>
+            <div v-if="!real_empty(edit_info.fontSize)">
+                <span>字体大小</span>
+                <input type="text" v-model="edit_info.fontSize" @change="changeActiveObject()"/>
+            </div>
         </div>
+
+        <button @click="del">删除元素</button>
     </div>
 </div>
 
 
 <script type="text/javascript">
+
 
     let type = null;
 
@@ -53,13 +72,67 @@
         type = type_name;
     }
 
-    Vue.createApp({
+    var app = Vue.createApp({
         data() {
             return {
+                edit_info: {
+                    type: '',
+                    left: "",
+                    top: '',
+                    width: '',
+                    height: "",
+                    text: '',
+                    fontSize: ''
+                },
                 message: 'Hello Vue!'
             }
+        },
+        methods: {
+            real_empty(data) {
+                if (data === undefined || data === null) return true;
+                return false
+            },
+            changeActiveObject() {
+                console.log(111);
+                let obj = canvas.getActiveObject();
+                console.log(obj);
+                if (obj) {
+                    let attr = {}
+                    if (!this.real_empty(this.edit_info.left)) {
+                        attr.left = this.edit_info.left;
+                    }
+                    if (!this.real_empty(this.edit_info.top)) {
+                        attr.top = this.edit_info.top;
+                    }
+                    if (!this.real_empty(this.edit_info.fontSize)) {
+                        attr.fontSize = this.edit_info.fontSize;
+                    }
+                    if (!this.real_empty(this.edit_info.text)) {
+                        attr.text = this.edit_info.text;
+                    }
+
+                    // console.log(attr);
+                    obj.set(attr);
+                    canvas.requestRenderAll();
+                    console.log("set success", attr);
+                    // let type = obj.get('type');
+                    // app.edit_info.type = type;
+                    // app.edit_info.left = obj.left;
+                    // app.edit_info.top = obj.top;
+                    // app.edit_info.width = obj.width;
+                    // app.edit_info.height = obj.height
+                    // app.edit_info.fontSize = obj.fontSize
+                    //
+                    // console.log(app.edit_info);
+                }
+            },
+            del() {
+                let obj = canvas.getActiveObject();
+                canvas.remove(obj);
+            }
         }
-    }).mount('#app')
+    });
+    app = app.mount('#app')
     const canvas = new fabric.Canvas('canvas');
 
     canvas.on('drop', (opt) => {
@@ -85,6 +158,222 @@
 
         type = null;
     })
+    fabric.TableCell = fabric.util.createClass(fabric.Group, {
+        type: 'tableCell',
+        text: null,
+        rect: null,
+        initialize: function (rectOptions, textOptions, text) {
+            this.rect = new fabric.Rect(rectOptions)
+            this.text = new fabric.Textbox(text, {
+                ...textOptions,
+                selectable: false,
+            })
+            this.on('mousedblclick', () => {
+                this.selectable = false
+                this.text.selectable = true
+                this.canvas.setActiveObject(this.text)
+                this.text.enterEditing()
+            })
+            this.on('mousedown', () => {
+                // this.rect.set('fill', 'green')
+                // this.canvas.requestRenderAll()
+            })
+            this.text.on('editing:exited', () => {
+                this.text.selectable = false
+                this.selectable = true
+            })
+
+            this.callSuper('initialize', [this.rect, this.text], {
+                subTargetCheck: true,
+                objectCaching: false
+            })
+        },
+        toObject: function () {
+            return fabric.util.object.extend(this.callSuper('toObject'), {
+                text: this.text.get('text')
+            })
+        }
+    })
+
+    fabric.Table = fabric.util.createClass(fabric.Group, {
+        type: 'table',
+        borderWidth: 4, // 单元格边框宽度
+        rowHeights: [], // 行高，每一行的高度可以自由配置
+        columnWidths: [], // 列宽，每一列的宽度可以自由配置
+        initialize: function (tableOptions) {
+            const {left, top, borderWidth, rowHeights, columnWidths, columns, data} =
+                tableOptions
+
+            const rectOptions = {
+                rx: 0,
+                stroke: '#000',
+                fill: 'transparent',
+                shadow: 0,
+                strokeWidth: +borderWidth,
+                strokeUniform: true
+            }
+
+            const textOptions = {
+                lineHeight: 1,
+                fontSize: 20,
+                stroke: '#000',
+                fill: '#000',
+                selectable: false,
+                textAlign: 'center',
+                editingBorderColor: '#FF9002'
+            }
+
+            let arr = [];
+            if (columns) {
+                let totalW = 0;
+                for (let column of columns) {
+                    const cell = new fabric.TableCell(
+                        {
+                            ...rectOptions,
+                            left: totalW + 1,
+                            top: 0,
+                            width: column.width || 100,
+                            height: rowHeights
+                        },
+                        {
+                            ...textOptions,
+                            left: totalW + 1 + rectOptions.strokeWidth,
+                            top: rowHeights / 2 - textOptions.fontSize * textOptions.lineHeight/2,
+                            width: column.width || 100,
+                            height: rowHeights
+                        },
+                        column.title || ''
+                    )
+                    arr.push(cell)
+                    totalW += column.width || 100;
+                }
+            }
+
+            if (data) {
+                let index = 0;
+                for (let item of data) {
+                    let totalW = 0;
+                    for (let column of columns) {
+                        let key = column.key;
+                        const cell = new fabric.TableCell(
+                            {
+                                ...rectOptions,
+                                left: totalW + 1,
+                                top: rowHeights * (index + 1),
+                                width: column.width || 100,
+                                height: rowHeights
+                            },
+                            {
+                                ...textOptions,
+                                left: totalW + 1 + rectOptions.strokeWidth,
+                                top: rowHeights * (index + 1) + rowHeights / 2 - textOptions.fontSize * textOptions.lineHeight/2,
+                                width: column.width || 100,
+                                height: rowHeights
+                            },
+                            String(item[key] || ''),
+                        )
+                        arr.push(cell)
+                        totalW += column.width || 100;
+                    }
+                    index++;
+                }
+            }
+
+            this.borderWidth = borderWidth
+            this.rowHeights = rowHeights
+            this.columnWidths = columnWidths
+            this.data = data;
+            this.columns = columns;
+            this.callSuper('initialize', arr, {
+                subTargetCheck: true,
+                objectCaching: false,
+                left,
+                top
+            })
+        },
+        toObject: function () {
+            return fabric.util.object.extend(this.callSuper('toObject'), {
+                borderWidth: this.get('borderWidth'),
+                rowHeights: this.get('rowHeights'),
+                columnWidths: this.get('columnWidths'),
+                data: this.get('data'),
+                columns: this.get('columns')
+            })
+        }
+    })
+
+    fabric.Table.fromObject = function (o, callback) {
+        const options = {
+            left: o.left,
+            top: o.top,
+            rowHeights: o.rowHeights,
+            columnWidths: o.columnWidths,
+            borderWidth: o.borderWidth,
+            data: o.data,
+            columns: o.columns
+        }
+        const newTable = new fabric.Table(options)
+        callback(newTable)
+    }
+
+
+    function test() {
+        const options = {
+            left: 20,
+            top: 20,
+            borderWidth: 1,
+            rowHeights: 50,
+            columns: [
+                {
+                    title: "1111",
+                    key: "age",
+                    width: 100
+                },
+                {
+                    title: "2222",
+                    key: "name",
+                    width: 100
+                },
+                {
+                    title: "3333",
+                    key: "key3",
+                    width: 100
+                },
+                {
+                    title: "4444",
+                    key: "key4",
+                    width: 100
+                }
+            ],
+            data: [
+                {
+                    "age": "列1",
+                    "name": "列2",
+                    key3: "列3",
+                    key4: "列4"
+                },
+                {
+                    "age": 111,
+                    "name": "xxxx",
+                    key3: "xxx",
+                    key4: "key4"
+                },
+                {
+                    "age": 111,
+                    "name": "xxxx",
+                    key3: "xxx",
+                    key4: "key4"
+                }
+            ],
+        };
+        // const canvas = this.canvas;
+        // const center = canvas.getCenter();
+        const table = new fabric.Table(options);
+        // table.set("left", center.left - table.width / 2);
+        // table.set("top", center.top - table.height / 2);
+        canvas.add(table);
+
+    }
 
     function set() {
         let width = document.querySelector("#a").value;
@@ -95,7 +384,6 @@
         canvas.setHeight(height)
         // document.querySelector("#canvas").width = width;
         // document.querySelector("#canvas").height = height;
-
     }
 
     function setText(text, sys_field) {
@@ -140,11 +428,10 @@
     }
 
     function setRect(attr) {
-        console.log(attr);
         let Rect = fabric.Rect;
         let line = new fabric.Rect({
-            left: attr.x || 0,
-            top: attr.y || 0,
+            left: attr ? attr.x : 0,
+            top: attr ? attr.y : 0,
             width: 200,
             height: 100,
             fill: 'transparent', // 填充色
@@ -155,39 +442,40 @@
     }
 
     canvas.on('selection:created', function () {
-        let obj = canvas.getActiveObject();
-        console.log(obj, obj.get('type'), obj.sys_type);
-    });
-
-    canvas.on('selection:selected', function () {
-        let obj = canvas.getActiveObject();
-        console.log(obj, obj.get('type'), obj.sys_type);
+        saveActiveInfo();
     });
 
 
     canvas.on('object:modified', function () {
+        saveActiveInfo();
         console.log("change")
         let obj = canvas.getActiveObject();
-        console.log(obj);
-        let type = obj.get('type');
-        if (type === 'rect') {
-            let attr = {
-                width: obj.width * obj.scaleX,
-                height: obj.height * obj.scaleY,
-                scaleX: 1,
-                scaleY: 1
-            }
-            obj.set(attr);
+        let attr = {
+            width: obj.width * obj.scaleX,
+            height: obj.height * obj.scaleY,
+            scaleX: 1,
+            scaleY: 1
         }
-        if (type === 'i-text') {
-            let attr = {
-                width: obj.width * obj.scaleX,
-                height: obj.height * obj.scaleY,
-                scaleX: 1,
-                scaleY: 1,
-            }
-            obj.set(attr);
-        }
+        obj.set(attr);
+        // let type = obj.get('type');
+        // if (type === 'rect') {
+        //     let attr = {
+        //         width: obj.width * obj.scaleX,
+        //         height: obj.height * obj.scaleY,
+        //         scaleX: 1,
+        //         scaleY: 1
+        //     }
+        //     obj.set(attr);
+        // }
+        // if (type === 'i-text') {
+        //     let attr = {
+        //         width: obj.width * obj.scaleX,
+        //         height: obj.height * obj.scaleY,
+        //         scaleX: 1,
+        //         scaleY: 1,
+        //     }
+        //     obj.set(attr);
+        // }
 
     })
 
@@ -198,9 +486,9 @@
     function handleImg(e) {
         console.log(e.files[0])
         let url = window.URL.createObjectURL(e.files[0])
-       console.log(url);
-        fabric.Image.fromURL('https://img-home.csdnimg.cn/images/20240218021830.png',(img)=>{
-            img.set({scaleX:0.2,scaleY:0.2})
+        console.log(url);
+        fabric.Image.fromURL('https://img-home.csdnimg.cn/images/20240218021830.png', (img) => {
+            img.set({scaleX: 0.2, scaleY: 0.2})
             canvas.add(img);
         })
         // var img = new fabric.Image(url);
@@ -221,6 +509,22 @@
         //     }
         // }
         // reader.readAsDataURL(e.target.files[0]);
+    }
+
+    function saveActiveInfo() {
+        let obj = canvas.getActiveObject();
+        if (obj) {
+            let type = obj.get('type');
+            app.edit_info.type = type;
+            app.edit_info.text = obj.text;
+            app.edit_info.left = obj.left;
+            app.edit_info.top = obj.top;
+            app.edit_info.width = obj.width;
+            app.edit_info.height = obj.height
+            app.edit_info.fontSize = obj.fontSize
+
+            console.log(app.edit_info);
+        }
     }
 
 </script>
