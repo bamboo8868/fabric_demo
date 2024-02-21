@@ -387,10 +387,14 @@
     }
 
     function setText(text, sys_field) {
-        let obj = new fabric.Text(text, {
+        console.log(111);
+        let obj = new fabric.Textbox(text, {
             left: 100,
             top: 100,
-            fontSize: 50
+            width:100,
+            fontSize: 50,
+            splitByGrapheme:true,
+            textAlign: 'justify'
         })
         if (sys_field) {
             obj.sys_field = sys_field;
